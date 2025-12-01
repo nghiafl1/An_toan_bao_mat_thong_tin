@@ -10,10 +10,16 @@ from PySide6.QtCore import Qt
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 
+# --- THÊM MỚI: Import thư viện đọc file Word ---
+try:
+    from docx import Document
+except ImportError:
+    Document = None  # Xử lý trường hợp người dùng chưa cài thư viện
+
 # ================= AES CONSTANTS & HELPERS =================
 
 S_BOX = [
-    # 0     1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+    # 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
     0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
     0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
     0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
@@ -290,7 +296,7 @@ def decrypt_text(cipher_b64: str, password: str) -> str:
     plaintext = aes256_decrypt_cbc(ciphertext, key, iv)
     return plaintext.decode("utf-8")
 
-# ==================== GUI (giữ nguyên phần lớn của bạn) ====================
+# ==================== GUI ====================
 class AESApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -385,12 +391,32 @@ class AESApp(QWidget):
         self.encrypt_btn.clicked.connect(self.encrypt_action)
         self.decrypt_btn.clicked.connect(self.decrypt_action)
 
+    # --- SỬA ĐỔI HÀM NÀY ĐỂ ĐỌC FILE WORD ---
     def open_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Chọn file văn bản", "", "Text Files (*.txt)")
+        # Cho phép chọn cả .txt và .docx
+        file_filter = "All Files (*);;Text Files (*.txt);;Word Documents (*.docx)"
+        path, _ = QFileDialog.getOpenFileName(self, "Chọn file văn bản", "", file_filter)
+        
         if path:
             try:
-                with open(path, "r", encoding="utf-8") as f:
-                    self.text_input.setPlainText(f.read())
+                # Nếu là file Word (.docx)
+                if path.endswith(".docx"):
+                    if Document is None:
+                        QMessageBox.warning(self, "Lỗi thiếu thư viện", "Bạn chưa cài đặt thư viện 'python-docx'.\nVui lòng chạy lệnh: pip install python-docx")
+                        return
+                        
+                    doc = Document(path)
+                    # Nối các đoạn văn bản lại với nhau
+                    full_text = []
+                    for para in doc.paragraphs:
+                        full_text.append(para.text)
+                    self.text_input.setPlainText('\n'.join(full_text))
+                    
+                # Nếu là file text (.txt)
+                else:
+                    with open(path, "r", encoding="utf-8") as f:
+                        self.text_input.setPlainText(f.read())
+                        
             except Exception as e:
                 QMessageBox.critical(self, "Lỗi", f"Không thể đọc file:\n{e}")
 
